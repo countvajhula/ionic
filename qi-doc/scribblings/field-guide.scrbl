@@ -31,9 +31,9 @@ A journeyman of one's craft -- a woodworker, electrician, or a plumber, say -- a
 
 @subsection{Separate Effects from Other Computations}
 
-In functional programming, "effects" refer to anything a function does that is not captured in its inputs and outputs. This could include things like printing to the screen, writing to a file, or mutating a global variable.
+In functional programming, @deftech{effects} refer to anything a function does that is not captured in its @tech{inputs} and @tech{outputs}. This could include things like printing to the screen, writing to a file, or mutating a global variable.
 
-In general, pure functions (that is, functions free of such effects) are easier to understand and easier to reuse, and favoring their use is considered good functional style. But of course, it's necessary for your code to actually do things besides compute values, too! There are many ways in which you might combine effects and pure functions, from mixing them freely, as you might in Racket, to extracting them completely using monads, as you might in Haskell. Qi encourages using pure functions side by side with what we could call "pure effects."
+In general, pure functions (that is, functions free of such effects) are easier to understand and easier to reuse, and favoring their use is considered good functional style. But of course, it's necessary for your code to actually do things besides compute values, too! There are many ways in which you might combine effects and pure functions, from mixing them freely, as you might in Racket, to extracting them completely using monads, as you might in Haskell. Qi encourages using pure functions side by side with what we could call @deftech{pure effects}.
 
 If you have a function with ordinary inputs and outputs that also performs an effect, then, to adopt this style, decouple the effect from the rest of the function (@seclink["Use_Small_Building_Blocks"]{splitting it into smaller functions}, as necessary) and then invoke it via an explicit use of the @racket[effect] form, thus neatly separating the functional computation from the effect.
 
@@ -99,9 +99,11 @@ To use it, first wrap the entire expression @emph{invoking} the flow with a @rac
   @defform[(probe flo)]
   @defidform[readout]
 )]{
-  @racket[probe] simply marks a @tech{flow} invocation for debugging, and does not change its functionality. Then, when evaluation encounters the first occurrence of @racket[readout] within @racket[flo], the values at that point are immediately returned as the value of the entire @racket[flo]. This is done via a @tech/reference{continuation}, so that you may precede it with whatever flows you like that might help you understand what's happening at that point, and you don't have to worry about it affecting downstream flows during the process of debugging since those flows would simply never be hit. Additionally, readouts may be placed @emph{anywhere} within the flow, and not necessarily on the main stream -- it will always return the values observed at the specific point where you place the readout.
+  @racket[probe] on its own simply marks a @tech{flow} invocation for debugging, and does not change its functionality. Then, when evaluation encounters the first occurrence of @racket[readout] within @racket[flo], the values at that point are immediately returned as the value of the entire @racket[flo]. This is done via a @tech/reference{continuation}, so that you may precede it with whatever flows you like that might help you understand what's happening at that point, and you don't have to worry about it affecting downstream flows during the process of debugging since those flows would simply never be hit. Additionally, readouts may be placed @emph{anywhere} within the flow, and not necessarily on the main stream -- it will always return the values observed at the specific point where you place the readout.
 
   Note that @racket[probe] is a Racket (rather than Qi) form, and it must wrap a flow @emph{invocation} rather than a flow @emph{definition}. The @racket[readout], on the other hand, is a Qi expression and must be placed somewhere within the flow @emph{definition}.
+
+  Finally, it's important to know that placing a readout represents a change to the program, and it could mean that the running program you are observing is subtly different from the original one. See @secref["Schrodinger_s_Probe"] to understand this phenomenon.
 
 @racketblock[
     (~> (5) sqr (* 2) add1)
@@ -411,17 +413,99 @@ So in general, use mutable values with caution. Such values can be useful as sid
 
 @subsubsection{Order of Effects}
 
- Qi @tech{flows} may exhibit a different order of effects (in the @seclink["Separate_Effects_from_Other_Computations"]{functional programming sense}) than equivalent Racket functions.
+In general, the behavior of @emph{pure} (in the @seclink["Separate_Effects_from_Other_Computations"]{functional programming sense}) Qi @tech{flows} is the same as that of equivalent Racket expressions, but effectful flows may exhibit a different order of effects.
 
 Consider the Racket expression: @racket[(map sqr (filter odd? (list 1 2 3 4 5)))]. As this invokes @racket[odd?] on all of the elements of the input list, followed by @racket[sqr] on all of the elements of the intermediate list, if we imagine that @racket[odd?] and @racket[sqr] print their inputs as a side effect before producing their results, then executing this program would print the numbers in the sequence @racket[1,2,3,4,5,1,3,5].
 
-The equivalent Qi flow is @racket[(~> ((list 1 2 3 4 5)) (filter odd?) (map sqr))]. As this sequence is @seclink["Don_t_Stop_Me_Now"]{deforested by Qi's compiler} to avoid multiple passes over the data and the memory overhead of intermediate representations, it invokes the functions in sequence @emph{on each element} rather than @emph{on all of the elements of each list in turn}. The printed sequence with Qi would be @racket[1,1,2,3,3,4,5,5].
+The equivalent Qi flow is @racket[(~>> ((list 1 2 3 4 5)) (filter odd?) (map sqr))]. As this sequence is @seclink["Don_t_Stop_Me_Now"]{deforested by Qi's compiler} to avoid multiple passes over the data and the memory overhead of intermediate representations, it invokes the functions in sequence @emph{on each element} rather than @emph{on all of the elements of each list in turn}. The printed sequence with Qi would be @racket[1,1,2,3,3,4,5,5].
 
-Yet, either implementation produces the same output: @racket[(list 1 9 25)].
+Yet, in this case, either implementation produces the same output: @racket[(list 1 9 25)]. Often, as we see here, exhibiting a different order of effects does not make a difference to the @tech{output} of the program.
 
-So, to reiterate, while the behavior of @emph{pure} Qi flows will be the same as that of equivalent Racket expressions, effectful flows may exhibit a different order of effects. In the case where the output of such effectful flows is dependent on those effects (such as relying on a mutable global variable), these flows could even produce different output than otherwise equivalent (from the perspective of inputs and outputs, disregarding effects) Racket code.
+But in the case where the output of such effectful flows is dependent on those effects (such as by incorporating mutable state), these flows could produce different output than otherwise equivalent Racket code, as this next example shows.
 
-If you'd like to use Racket's order of effects in any flow, @seclink["Using_Racket_to_Define_Flows"]{write the flow in Racket} by using a wrapping @racket[esc].
+@racketblock[
+  (define add-count
+    (let ([v 0])
+      (lambda (arg)
+        (set! v (+ v 1))
+        (+ arg v))))
+
+  (~>> ((list 1 2 3)) (filter odd?) (map add-count) (map add-count))
+]
+
+Here, the unoptimized program would be equivalent to:
+
+@racketblock[
+  ((lambda (lst)
+     (map add-count
+          (map add-count
+               (filter odd? lst))))
+   (list 1 2 3))
+]
+
+… which produces the output @racket[(list 5 9)].
+
+The optimized program deforests the sequence of functional operations, interleaving the effects (as discussed above), producing a different result, @racket[(list 4 10)].
+
+From the perspective of Qi, such programs are poorly defined, and it is better to @seclink["Designing_Effects"]{design effects} to avoid such nonlocal interactions. If you'd like to employ such effects all the same, it would be advisable to write the program in Racket, encapsulating such behavior in a flow that could be used at a higher level without nonlocal effects, for instance @seclink["Using_Racket_to_Define_Flows"]{by using a wrapping @racket[esc]}. A flow specified with @racket[esc] follows Racket's order of effects since it is a Racket program.
+
+See @secref["Effect_Locality"] for more insights into Qi's handling of effects and its implications for the design of effects in your flows.
+
+@subsubsection{Schrodinger's Probe}
+
+Another curious thing to watch out for is that use of the @seclink["Using_a_Probe"]{probe debugger} can affect the @seclink["Order_of_Effects"]{order of effects}, as it could suppress optimizations that would otherwise be performed if the @tech{flow} were unobserved.
+
+Consider this example:
+
+@racketblock[
+(define-flow foo
+  (~> (pass odd?) (>< sqr)))
+]
+
+This program would be optimized by the Qi compiler to:
+
+@racketblock[
+  (>< (if odd? sqr ⏚))
+]
+
+If we placed a readout here:
+
+@racketblock[
+(define-flow foo
+  (~> (pass odd?) readout (>< sqr)))
+]
+
+… then for an input list @racket[(list 1 2 3)], the readout would show @racket[(list 1 3)]. But in the optimized program above, the readout would not even represent a valid point in the program (where should it be placed?). Thus, the readout is showing values that are flowing in the original program rather than the one that would actually have been executed in the absence of the readout.
+
+Yet, the optimization (@seclink["Qi_s_Guarantee_on_Effects"]{by requirement}) does not change the meaning of the program in the absence of effects, and so the actual @tech{output} of the program is consistent with the intermediate values that are read out.
+
+If there are @tech{effects} present, however, then the situation gets more spooky.
+
+The first program would look something like this:
+
+@racketblock[
+(define-flow foo
+  (~> (pass (effect E₁ odd?))) (>< (effect E₂ sqr)))
+]
+
+… where all the effects E₁ would happen before any of the effects E₂. And the second program would look like:
+
+@racketblock[
+  (>< (if (effect E₁ odd?) (effect E₂ sqr) ⏚))
+]
+
+… where the effects E₁ and E₂ would be interleaved. Though it changes the order of effects, the optimization is still valid because it preserves @tech{well-ordering}. The second program here represents what will actually be executed when the first program is written.
+
+But what happens when we place a @racket[readout] in the source program, this time?
+
+@racketblock[
+(define-flow foo
+  (~> (pass (effect E₁ odd?))) readout (>< (effect E₂ sqr)))
+]
+
+Here, with the @racket[readout], the program once again would not be optimized, and thus, all the effects E₁ would occur first before the values are read out. Without the @racket[readout], the flow would be optimized, as we have just seen, and the effects E₁ and E₂ would be interleaved, so that the effects observed in the presence of the readout are different from what would be observed without it!
+
+So it's important to bear in mind that one cannot observe a flow using @racket[probe] without changing the program being observed, a change which in some cases has no observable impact, and which in other cases (i.e. when there are effects involved) could be significant. But now that you understand this phenomenon, you can develop intuition for the nature of such changes, and how best to use the tool to find the answers you are looking for.
 
 @section{Effectively Using Feedback Loops}
 
