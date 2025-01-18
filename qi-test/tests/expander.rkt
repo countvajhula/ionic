@@ -104,6 +104,9 @@
                             ((#%host-expression f)
                              (#%host-expression 1)
                              __))))
+    (test-expand "sep"
+                 #'(sep (>< f))
+                 #'(sep (amp (esc (#%host-expression f)))))
     (test-expand "#%deforestable"
                  #'(#%deforestable name info (floe 0) (expr 0))
                  #'(#%deforestable name

@@ -245,27 +245,80 @@
                    ""))
     (test-suite
      "sep"
-     (check-equal? ((☯ (~> △ +))
-                    null)
-                   0)
-     (check-equal? ((☯ (~> sep +))
-                    null)
-                   0)
-     (check-equal? ((☯ △)
-                    (list 1))
-                   1)
-     (check-equal? ((☯ (~> △ +))
-                    (list 1 2 3 4))
-                   10)
-     (check-exn exn:fail:contract?
-                (thunk ((☯ (~> △ +))
-                        #(1 2 3 4))))
-     (check-equal? ((☯ (~> (△ +) ▽)) (list 1 2 3) 10)
-                   (list 11 12 13)
-                   "separate into a flow with presupplied values")
-     (check-equal? ((☯ (~> (△ (~> X string-append)) ▽)) (list "1" "2" "3") "10")
-                   (list "101" "102" "103")
-                   "separate into a non-primitive flow with presupplied values"))
+     (test-suite
+      "basic"
+      (check-equal? ((☯ (~> △ +))
+                     null)
+                    0)
+      (check-equal? ((☯ (~> sep +))
+                     null)
+                    0)
+      (check-equal? ((☯ △)
+                     (list 1))
+                    1)
+      (check-equal? ((☯ (~> △ +))
+                     (list 1 2 3 4))
+                    10)
+      (check-exn exn:fail:contract?
+                 (thunk ((☯ (~> △ +))
+                         #(1 2 3 4))))
+      (check-exn exn:fail:contract?
+                 (thunk ((☯ (~> △ ▽)) 1 2 3))))
+     (test-suite
+      "multiple inputs (zip-like)"
+      (test-equal? "lists of the same size"
+                   ((☯ (~> (△ list) ▽))
+                    '(a b c) '(1 2 3))
+                   '((a 1) (b 2) (c 3)))
+      (test-equal? "lists of different sizes truncates at shortest list"
+                   ((☯ (~> (△ list) ▽))
+                    '(a b) '(1 2 3))
+                   '((a 1) (b 2)))
+      (test-equal? "lists of different sizes truncates at shortest list"
+                   ((☯ (~> (△ list) ▽))
+                    '(a b c) '(1 2))
+                   '((a 1) (b 2)))
+      (test-equal? "any empty list causes no values to be returned"
+                   ((☯ (~> (△ list) ▽))
+                    '() '(1 2 3))
+                   null)
+      (test-equal? "any empty list causes no values to be returned"
+                   ((☯ (~> (△ list) ▽))
+                    '(a b c) '())
+                   null)
+      (test-equal? "more than two lists"
+                   ((☯ (~> (△ list) ▽))
+                    '(a b c) '(1 2 3) '(P Q R))
+                   '((a 1 P) (b 2 Q) (c 3 R)))
+      (test-equal? "just one list"
+                   ((☯ (~> (△ list) ▽))
+                    '(a b c))
+                   '((a) (b) (c)))
+      (test-equal? "no lists"
+                   ((☯ (~> (△ list) ▽)))
+                   null)
+      (test-equal? "zip with primitive operation"
+                   ((☯ (~> (△ +) ▽))
+                    '(1 2) '(3 4))
+                   '(4 6))
+      (test-equal? "zip with flow operation"
+                   ((☯ (~> (△ (~> (>< string->number) +)) ▽))
+                    '("1" "2") '("3" "4"))
+                   '(4 6))
+      (test-equal? "zip with multi-valued flow"
+                   ((☯ (~> (△ _) ▽))
+                    '("1" "2") '("3" "4"))
+                   '("1" "3" "2" "4"))
+      (test-equal? "zip with arity-reducing flow"
+                   ((☯ (~> (△ (pass (equal? "1"))) ▽))
+                    '("1" "2") '("3" "4"))
+                   '("1"))
+      (check-equal? ((☯ (~> (△ +) ▽)) (list 1 2 3) (list 10 10 10))
+                    (list 11 12 13)
+                    "separate into a flow with presupplied values (modified legacy test)")
+      (check-equal? ((☯ (~> (△ (~> X string-append)) ▽)) (list "1" "2" "3") (list "10" "10" "10"))
+                    (list "101" "102" "103")
+                    "separate into a non-primitive flow with presupplied values (modified legacy test)")))
     (test-suite
      "gen"
      (check-equal? ((☯ (gen 5)))

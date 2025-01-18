@@ -88,6 +88,7 @@ When reading languages like English, we understand what we read in terms of word
 @;clarify arity of adaptation; and scribble mathify some of these things (and review/distinguish from code); and add diagrams - look at the prolog bookmark for the fold diagram
 @itemlist[
    @item{@racket[(~> △ (>< f) ...)] -- "sep-amp". A standard mapping over values extracted from a list.}
+   @item{@racket[(△ ▽)] -- "zip". A standard way to collect corresponding elements of lists.}
    @item{@racket[(~> (-< _ f ...) ...)] -- "augment". The tee junction may augment the flow in any order -- the signature of this phrase is the presence of a @racket[_] in the tee junction.}
    @item{@racket[(~> (-< f ...) g)] -- "diamond composition". This is one way to adapt a flow @racket[f] of arity @${k} to a flow @racket[g] of arity @${m}, that is, by branching the @${k} inputs into @${m} copies of @racket[f] (assuming @racket[f] produces one output). It is the same as the "composition operator" used in defining @hyperlink["https://en.wikipedia.org/wiki/Primitive_recursive_function"]{primitive recursive functions}.}
    @item{@racket[(group 1 car-flo cdr-flo)] -- "pare". This is analogous to "car and cdr" style destructuring with lists, but for segregating values instead. Note that while it is analogous, this isn't "destructuring," since the values taken together @seclink["Values_are_Not_Collections"]{do not form a data structure}.}
@@ -152,6 +153,7 @@ Qi flow expressions expand to a small core language which is then @seclink["It_s
 [floe _
       (gen expr ...)
       sep
+      (sep floe)
       collect
       (esc expr)
       (clos floe)

@@ -9,6 +9,7 @@
          check-list
          check-large-list
          check-values
+         check-list-values
          check-two-values
          run-benchmark
          run-summary-benchmark
@@ -20,7 +21,8 @@
 
 (require (only-in racket/list
                   range
-                  second)
+                  second
+                  make-list)
          (only-in racket/function
                   curryr)
          (only-in adjutor
@@ -91,6 +93,15 @@
     (for ([i how-many])
       (call-with-values (λ ()
                           (apply values vs))
+                        fn))))
+
+(define (check-list-values fn how-many)
+  ;; call a function with multiple list values as independent arguments
+  (let* ([vs (range 10)]
+         [list-vs (make-list 10 vs)])
+    (for ([i how-many])
+      (call-with-values (λ ()
+                          (apply values list-vs))
                         fn))))
 
 (define (check-two-values fn how-many)

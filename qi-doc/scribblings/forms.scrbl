@@ -150,9 +150,13 @@ The full surface syntax of Qi is given below. Note that this expands to a @secli
   @defform[#:link-target? #f
            (sep flo)]
 )]{
-  Separate the input list into its component values. This is the inverse of @racket[▽].
+  For a single input list, separate it into its component values after first applying @racket[flo], if provided. This is the inverse of @racket[▽].
 
-  When used in parametrized form with a presupplied @racket[flo], this @tech{flow} accepts any number of inputs, where the first is expected to be the list to be unraveled. In this form, the flow separates the list into its component values and passes each through @racket[flo] along with the remaining input values.
+  When given multiple input lists, this resembles the standard "zip" operation in functional programming languages. Specifically: combine corresponding members of each input list using @racket[flo], producing these results directly as @seclink["values-model" #:doc '(lib "scribblings/reference/reference.scrbl")]{values}. If no @racket[flo] is specified, default to @racket[values], so that the behavior is to simply separate all input lists into values, in order of appearance, by index. A common choice of @racket[flo] here is @racket[list], yielding the usual "zip."
+
+  If the input lists aren't all of the same size, the operation is truncated when the shortest list is exhausted.
+
+  In the common case where @racket[flo] is @code{1 × 1} (i.e., where it accepts one input and produces one output), and where the input lists are all of the same size, the number of outputs will be the same as the length of each input list. But as @seclink["What_is_a_Flow_"]{flows can produce any number of values}, this is not necessarily the case in general.
 
   @racket[△] and @racket[▽] often allow you to use functions directly where you might otherwise need to use an indirection like @racket[apply] or @racket[list].
 
@@ -160,10 +164,13 @@ The full surface syntax of Qi is given below. Note that this expands to a @secli
     #:eval eval-for-docs
     ((☯ (~> △ +)) (list 1 2 3 4))
     ((☯ (~> △ (>< sqr) ▽)) (list 1 2 3 4))
-    ((☯ (~> (△ +) ▽)) (list 1 2 3) 10)
+    ((☯ (~> (△ +) ▽)) (list 1 2 3) (list 10 10 10))
     (struct kitten (name age) #:transparent)
     ((☯ (~> (△ kitten) ▽))
-     (list "Ferdinand" "Imp" "Zacky") 0)
+     (list "Ferdinand" "Imp" "Zacky") (list 0 0 0))
+    ((☯ (△ list)) '(a b c) '(1 2 3))
+    ((☯ (△ +)) (list 1 2 3) (list 1 2 3))
+    ((☯ (△ (~> (-< _ _) ▽))) (list 1 2 3))
   ]
 }
 

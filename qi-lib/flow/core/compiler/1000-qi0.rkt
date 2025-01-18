@@ -142,22 +142,23 @@
     [((~datum #%host-expression) hex)
      this-syntax]))
 
-;; The form-specific parsers, which are delegated to from
-;; the qi0->racket macro:
-
 #|
+
+The form-specific parsers, which are delegated to from the qi0->racket
+macro, are below.
+
+Keep in mind that as we are at the code generation stage here -- which
+is post-expansion and post-optimization -- for any synthesized syntax
+at this stage, any floe positions there must be expressed purely in
+the core language and should be recursively codegen'd by calling
+`qi0->racket` on them. In particular, any Racket functions used must
+be explicitly `esc`aped, as plain function identifiers are not part of
+the core language though they are part of the surface language.
+
 A note on error handling:
 
-Some forms, in addition to handling legitimate syntax, also have
-catch-all versions that exist purely to provide a helpful message
-indicating a syntax error. We do this since a priori the qi0->racket macro
-would ignore syntax that doesn't match any pattern. Yet, for all of
-these named forms, we know that (or at least, it is prudent to assume
-that) the user intended to employ that particular form of the DSL. So
-instead of allowing it to fall through for interpretation as Racket
-code, which would yield potentially inscrutable errors, the catch-all
-forms allow us to provide appropriate error messages at the level of
-the DSL.
+There should be no syntax errors reported at this stage, as that is
+already handled during expansion by Syntax Spec.
 
 |#
 
@@ -165,15 +166,17 @@ the DSL.
 
   (define (sep-parser stx)
     (syntax-parse stx
-      [_:id
-       #'(qi0->racket (if (esc list?)
-                          (#%fine-template (apply values _))
-                          (#%fine-template (raise-argument-error '△
-                                                                 "list?"
-                                                                 _))))]
-      [(_ onex:clause)
-       #'(λ (v . vs)
-           ((qi0->racket (~> △ (>< (#%fine-template (apply (qi0->racket onex) _ vs))))) v))]))
+      [(_ op:clause)
+       #'(zip-with (qi0->racket op))]
+      [_:id #'(λ args
+                (if (singleton? args)
+                    (let ([v (first args)])
+                      (if (list? v)
+                          (apply values v)  ; fast path to the basic △ behavior
+                          (raise-argument-error '△
+                                                "list?"
+                                                v)))
+                    (apply (qi0->racket (△ _)) args)))]))
 
   (define (select-parser stx)
     (syntax-parse stx

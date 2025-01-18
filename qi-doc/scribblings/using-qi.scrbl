@@ -350,7 +350,7 @@ For such cases, by means of a @racket[divert] (or its alias, @racket[%]) clause 
       [begin? (~> (== begin-actions _) eval-sequence)]
       [cond? (~> (== cond->if _) eval)]
       [application? (~> (-< (~> (== operator _) eval)
-                            (~> (== operands _) (△ eval))) apply)]
+                            (~> (== operands (as env)) (>< (eval env)))) apply)]
       [else (error "Unknown expression type -- EVAL" 1>)])
 }
 
