@@ -208,6 +208,8 @@ The equivalent Qi flow is:
     (~> (filter odd?) (map sqr)))
 }
 
+Note that @racket[filter] and @racket[map] here are the ones from @racketmodname[qi/list].
+
 Here, under the hood, each element of the input list is processed one at a time, with both of these functions being invoked on it in sequence, and then the output list is constructed by accumulating these individual results. This ensures that no intermediate lists are constructed along the way and that the input list is traversed just once -- a standard optimization technique called "stream fusion" or "deforestation." The Qi version produces the same result as the Racket code above, but it can be both faster as well as more memory-efficient, especially on large input lists. Note however that if the functions used in @racket[filter] and @racket[map] are not @emph{pure}, that is, if they perform side effects like printing to the screen or writing to a file, then the Qi flow would exhibit a different @seclink["Order_of_Effects"]{order of effects} than the Racket version.
 
 @section{Curbing Curries and Losing Lambdas}
