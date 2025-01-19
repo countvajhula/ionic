@@ -41,6 +41,7 @@ The full surface syntax of Qi is given below. Note that this expands to a @secli
             &
             OR
             ∥
+            !
             NOR
             NAND
             XNOR
